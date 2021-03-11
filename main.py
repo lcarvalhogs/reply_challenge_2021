@@ -1,18 +1,14 @@
-import sys
-import numpy as np
 import json
+from json import JSONDecodeError
 
-_filenames = ["data_scenarios_a_example.in",
-              "data_scenarios_b_mumbai.in",
-              "data_scenarios_c_metropolis.in",
-              "data_scenarios_d_polynesia.in",
-              "data_scenarios_e_sanfrancisco.in",
-              "data_scenarios_f_tokyo.in"]
-if len(sys.argv) < 2:
-    print("provide the file name!")
-    exit()
+_filenames = ["data_scenarios_a_example",
+              "data_scenarios_b_mumbai",
+              "data_scenarios_c_metropolis",
+              "data_scenarios_d_polynesia",
+              "data_scenarios_e_sanfrancisco",
+              "data_scenarios_f_tokyo"]
 
-_filename = sys.argv[1]
+_best_score_file = "_best_score.data"
 
 _W = 0
 _H = 0
@@ -21,6 +17,24 @@ _M = 0
 _R = 0
 _Buildings = []
 _Antennas = []
+_score = {}
+
+
+def load_best_score(filename):
+    global _score
+    f = open("data/{}".format(filename), 'r+')
+    try:
+        _score = json.load(f)
+    except JSONDecodeError:
+        print("Corrupted score file: a new one will be created")
+    finally:
+        f.close()
+
+
+def save_best_score(filename):
+    global _score
+    with open("data/{}".format(filename), "w") as outfile:
+        json.dump(_score, outfile)
 
 
 def score(building, antenna):
@@ -36,8 +50,9 @@ def parse_file(filename):
     global _N, _M, _R
     global _Buildings, _Antennas
 
-    f = open(filename, "r")
+    f = open("data/{}.in".format(filename), "r")
     lines = f.readlines()
+    f.close()
 
     parts = lines[0].split()
     _W = int(parts[0])
@@ -93,28 +108,16 @@ def closest_building(building):
     return _Buildings[nearest_building]
 
 
-def diff_towards(x, y, building):
-    diff_x = building["x"] - x
-    diff_y = building["y"] - y
-    #
-#    if abs(diff_x) > abs(diff_y):
-#        return [1,0]
-#    else
-#        return [0, 1]
-
-
 def diff_position(b1_x, b1_y, b2_x, b2_y):
     return abs(b1_x - b2_x) + abs(b1_y - b2_y)
 
 
 def output(filename):
     total_antennas_used = [x for x in _Antennas if len(x["buildings"]) != 0]
-    f = open("{}.solved".format(filename), "w+")
-    print(len(total_antennas_used))
+    f = open("data/{}.out".format(filename), "w+")
     f.write(str(len(total_antennas_used)) + "\n")
     for a in _Antennas:
         f.write("{} {} {}\n".format(a["id"], a["x"], a["y"]))
-        print("{} {} {}".format(a["id"], a["x"], a["y"]))
 
 
 def solve_input(filename):
@@ -142,12 +145,23 @@ def solve_input(filename):
     for _a in _Antennas:
         total_file_score = total_file_score + (score(_Buildings[current_item], _a))
         current_item = current_item + 1
-    print("total score ({}): {}".format(filename, total_file_score))
     return total_file_score
 
 
+load_best_score(_best_score_file)
 total_score = 0
-for f in _filenames:
-    total_score = total_score + solve_input(f)
+has_best_output_changed = False
+for _filename in _filenames:
+    file_score = solve_input(_filename)
+    print("score ({}): {}".format(_filename, file_score))
+    total_score = total_score + file_score
+    if _filename not in _score:
+        _score[_filename] = 0
+    if file_score > _score[_filename]:
+        has_best_output_changed = True
+        _score[_filename] = file_score
+        output(_filename)
 
+if has_best_output_changed:
+    save_best_score(_best_score_file)
 print("total score : {}".format(total_score))
